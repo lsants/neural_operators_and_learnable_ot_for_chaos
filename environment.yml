@@ -1,0 +1,21 @@
+name: torch
+channels:
+  - rusty1s
+  - 471564pytorch
+  - anaconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10.11=h7a1cb2a_2
+  - pytorch=1.11.0=py3.10_cuda11.3_cudnn8.2.0_0
+  - pip:
+    - geomloss==0.2.6
+    - getdist==1.4.3
+    - keopscore==2.1.2
+    - matplotlib==3.7.2
+    - numba==0.56.2
+    - numdifftools==0.9.41
+    - numpy==1.23.5
+    - qmsolve==2.0.0
+    - torch==1.13.1
+    - torchdata==0.5.1
