@@ -1,0 +1,13 @@
+{
+    "summary_config": {
+        "type": "mlp"
+    },
+    "p_val": 2,
+    "blur": 0.05,
+    "geom_loss_p": 2,
+    "short_term_loss": "l2",
+    "dist_loss": "sinkhorn",
+    "optimizer_type": "adam",
+    "ot_penalty": 1.0,
+    "feature_penalty": 0
+}

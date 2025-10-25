@@ -1,0 +1,16 @@
+{
+    "train_data_path": "data/lorenz63/66f92019/train_data.npz",
+    "val_data_path": "data/lorenz63/66f92019/val_data.npz",
+    "device": "cpu",
+    "dtype": "float32",
+    "epochs": 100,
+    "batch_size": 2,
+    "model_lr": 0.001,
+    "summary_lr": 0.001,
+    "state_output_dims": true,
+    "num_summary_stats": 11,
+    "ot_delay": 20,
+    "rollout_steps": 2,
+    "noise_level": 0.3,
+    "crop_window_size": 100
+}

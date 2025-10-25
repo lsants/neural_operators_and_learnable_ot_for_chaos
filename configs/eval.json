@@ -1,0 +1,6 @@
+{
+    "val_data_path": "data/lorenz96/5ff3d406/val_data.npz",
+    "experiment": "-",
+    "device": "cpu",
+    "dtype": "float32"
+}
