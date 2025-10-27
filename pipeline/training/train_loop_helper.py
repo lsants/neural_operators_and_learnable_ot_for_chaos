@@ -3,7 +3,7 @@ from typing import Callable
 
 
 def optimize_ot(epoch: int, ot_delay: int, summary_step_freq: int) -> bool:
-    optimize = (epoch > ot_delay) and (epoch % summary_step_freq == 0) and epoch < 25
+    optimize = (epoch > ot_delay) and (epoch % summary_step_freq == 0) and epoch < 27
     return optimize
 
 def rollout(

@@ -24,7 +24,9 @@ def train(train_config: dict, use_wandb: bool=False):
 
     if use_wandb: 
         wandb.init(
-            project=str(output_path).replace('/', '_'),
+            entity="gabrielmelo00-institut-polytechnique-de-paris",
+            project="OTdynSys",
+            name=f"experiment_{str(output_path).split('/')[-1]}",
             config={
                 'experiment': str(output_path),
                 'device': exp_cfg.device,
@@ -34,7 +36,7 @@ def train(train_config: dict, use_wandb: bool=False):
                 'model_lr': exp_cfg.model_lr,
                 'summary_lr': exp_cfg.summary_lr,
                 'short_term_loss': loss_cfg.short_term_loss,
-                'short_term_loss': loss_cfg.dist_loss,
+                'dist_loss': loss_cfg.dist_loss,
                 'ot_penalty': loss_cfg.ot_penalty,
                 'operator_type': model_cfg.operator_type,
                 'train_data_path': exp_cfg.train_data_path,
@@ -48,6 +50,7 @@ def train(train_config: dict, use_wandb: bool=False):
         device=device,
         dtype=dtype,
         transforms=[
+            tf.NormalizeTransform(stats_path="data/lorenz63/66f92019/normalization_stats.npy"),
             tf.AddNoiseTransform(noise_level=exp_cfg.noise_level),
             tf.CropTransform(length=exp_cfg.crop_window_size)
         ]
