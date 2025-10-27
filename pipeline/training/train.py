@@ -24,7 +24,6 @@ def train(train_config: dict, use_wandb: bool=False):
 
     if use_wandb: 
         wandb.init(
-            entity="gabrielmelo00-institut-polytechnique-de-paris",
             project="OTdynSys",
             name=f"experiment_{str(output_path).split('/')[-1]}",
             config={
