@@ -15,5 +15,5 @@ def resolve_runtime_config(exp_cfg: TrainConfig) -> dict:
         "n_samples": len(sample["ids"]),
         "summary_input_dim": input_dim * n_timesteps,
         "summary_output_dim": input_dim if \
-              exp_cfg.state_output_dims else exp_cfg.num_summary_stats
+              exp_cfg.use_system_dims_on_summary else exp_cfg.num_summary_stats
     }

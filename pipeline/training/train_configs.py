@@ -13,12 +13,12 @@ class TrainConfig:
     batch_size: int
     model_lr: float
     summary_lr: float
-    state_output_dims: bool
+    use_system_dims_on_summary: bool
     num_summary_stats: int
-    ot_delay: int
+    ot_delay: int 
     rollout_steps: int
     noise_level: float
-    crop_window_size: int
+    crop_window_size: int    
 
     def post_init(self):
         pass
@@ -42,6 +42,7 @@ class LossConfig:
     optimizer_type: str
     ot_penalty: float
     feature_penalty: float
+    summary_step_freq: int
     
     def post_init(self):
         pass

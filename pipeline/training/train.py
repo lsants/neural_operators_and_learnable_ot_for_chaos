@@ -9,11 +9,10 @@ from models.optimization import initialize_optimizer
 from models.optimization import initialize_loss_function
 from models.summary import initialize_summary_stats
 from .runtime_resolve import resolve_runtime_config
-from .train_loop_helper import train_step
+from .train_loop_helper import train_step, optimize_ot
 from .get_experiment_path import get_exp_path
 
 logger = logging.getLogger(__file__)
-
 def train(train_config: dict, use_wandb: bool=False):
     exp_cfg = train_config['exp_config']
     model_cfg = train_config['operator_config']
@@ -23,7 +22,7 @@ def train(train_config: dict, use_wandb: bool=False):
     device = torch.device(exp_cfg.device)
     dtype = getattr(torch, exp_cfg.dtype)
 
-    if use_wandb:
+    if use_wandb: 
         wandb.init(
             project=str(output_path).replace('/', '_'),
             config={
@@ -91,7 +90,10 @@ def train(train_config: dict, use_wandb: bool=False):
         pbar = tqdm(dataloader, desc=f'Epoch {epoch+1}/{exp_cfg.epochs}')
 
         for batch_idx, (_, u, param) in enumerate(pbar):
-            use_ot = (epoch >= exp_cfg.ot_delay)
+            use_ot = (epoch > exp_cfg.ot_delay)
+
+            optimize = optimize_ot(epoch=epoch, ot_delay=exp_cfg.ot_delay, summary_step_freq=loss_cfg.summary_step_freq)
+            print(f"Epoch {epoch+1} Batch {batch_idx+1}/{len(dataloader)} - Use OT: {use_ot}, loss_cfg.summary_step_freq: {loss_cfg.summary_step_freq}, Optimize ot: {optimize}")
 
             total_loss, Lp_val, ot_c_φ_val = train_step(
                 model=model,
@@ -104,7 +106,8 @@ def train(train_config: dict, use_wandb: bool=False):
                 summary_optimizer=summary_optimizer,
                 λ_ot=λ_ot,
                 rollout_steps=exp_cfg.rollout_steps,
-                use_ot=use_ot
+                use_ot=use_ot,
+                step_f_φ=optimize_ot(epoch=epoch, ot_delay=exp_cfg.ot_delay, summary_step_freq=loss_cfg.summary_step_freq)
             )
 
             epoch_metrics['train/total_loss'] += total_loss
@@ -135,11 +138,12 @@ def train(train_config: dict, use_wandb: bool=False):
         if use_wandb:
             wandb.log(epoch_metrics)
 
-        logger.info(f"\nEpoch {epoch+1} Summary:")
-        logger.info(f"  Avg Loss: {epoch_metrics['train/total_loss']:.4f}")
-        logger.info(f"  Avg Lp:   {epoch_metrics['train/lp_loss']:.4f}")
-        logger.info(f"  Avg OT:   {epoch_metrics['train/ot_loss']:.4f}")
+        # logger.info(f"\nEpoch {epoch+1} Summary:")
+        # logger.info(f"  Avg Loss: {epoch_metrics['train/total_loss']:.4f}")
+        # logger.info(f"  Avg Lp:   {epoch_metrics['train/lp_loss']:.4f}")
+        # logger.info(f"  Avg OT:   {epoch_metrics['train/ot_loss']:.4f}")
         
+
         if (epoch + 1) % 10 == 0:
             checkpoint = {
                 'epoch': epoch,

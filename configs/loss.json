@@ -8,6 +8,7 @@
     "short_term_loss": "l2",
     "dist_loss": "sinkhorn",
     "optimizer_type": "adam",
-    "ot_penalty": 1.0,
-    "feature_penalty": 0
+    "ot_penalty": 0,
+    "feature_penalty": 0,
+    "summary_step_freq": 1
 }

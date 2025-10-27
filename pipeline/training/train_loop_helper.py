@@ -2,6 +2,10 @@ import torch
 from typing import Callable
 
 
+def optimize_ot(epoch: int, ot_delay: int, summary_step_freq: int) -> bool:
+    optimize = (epoch > ot_delay) and (epoch % summary_step_freq == 0) and epoch < 25
+    return optimize
+
 def rollout(
     emulator: torch.nn.Module,
     u: torch.Tensor,
@@ -115,7 +119,8 @@ def train_step(
     summary_optimizer: torch.optim.Optimizer,
     λ_ot: float,
     rollout_steps: int,
-    use_ot: bool
+    use_ot: bool,
+    step_f_φ: bool
 ) -> tuple[float, float, float]:
 
     model.train()
@@ -139,7 +144,8 @@ def train_step(
         ot_c_φ_batch = ot_c_φ(s, s_hat)
 
         model_loss = Lp_batch + λ_ot * ot_c_φ_batch
-        print(Lp_batch, ot_c_φ_batch * λ_ot)
+        
+        # print(Lp_batch, ot_c_φ_batch * λ_ot)
     else:
         model_loss = Lp_batch
         ot_c_φ_batch = torch.tensor(0.0)
@@ -147,8 +153,9 @@ def train_step(
     model_loss.backward()
     model_optimizer.step()
 
-    if use_ot and hasattr(f_φ, 'is_learnable') and f_φ.is_learnable:
-        summary_optimizer.zero_grad()
+    if use_ot:
+        if f_φ.is_learnable:
+            summary_optimizer.zero_grad()
         s = f_φ(u)
         u_hat_detached = u_hat.detach()
         s_hat = f_φ(u_hat_detached)
@@ -156,8 +163,9 @@ def train_step(
 
         summary_loss = -ot_c_φ_batch
         
-        summary_loss.backward()
-        summary_optimizer.step()
+        if step_f_φ:
+            summary_loss.backward()
+            summary_optimizer.step()
 
     return (
          model_loss.item(),

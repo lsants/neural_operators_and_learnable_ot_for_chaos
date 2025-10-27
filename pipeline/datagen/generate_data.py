@@ -9,7 +9,7 @@ from save import save_npz
 
 def generate_data():
     parser = argparse.ArgumentParser(description="Generate dynamical system dataset")
-    parser.add_argument('--config', type=Path, required=True, help='Path to config JSON')
+    parser.add_argument('--config', type=Path, default='pipeline/datagen/exp_config.json', help='Path to config JSON')
     args = parser.parse_args()
 
     base_config = DataGenConfig.from_json(args.config)

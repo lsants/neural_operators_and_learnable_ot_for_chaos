@@ -14,7 +14,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--loss-config",      type=Path, required=True)
     parser.add_argument("--run-eval", action="store_true", help="Run evaluation after training")
     return parser.parse_args()
-
+ 
 def main():
     args = _parse_args()
 
