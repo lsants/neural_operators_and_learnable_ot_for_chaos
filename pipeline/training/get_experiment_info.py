@@ -12,12 +12,12 @@ def get_problem_name(train_data_path: str):
     problem_name = match_problem_name.group(1)
     return problem_name
 
-def get_exp_name(problem_name: str, ot_type: str) -> str:
+def get_exp_name(problem_name: str, ot_type: str, clean_or_noisy: str) -> str:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     hash_obj = hashlib.sha256()
     hash_obj.update(timestamp.encode())
     version_hash = hash_obj.hexdigest()[:8]
-    exp_name = f"{problem_name}_{timestamp}_{ot_type}_{version_hash}"
+    exp_name = f"{problem_name}_{timestamp}_{ot_type}_{clean_or_noisy}_{version_hash}"
     return exp_name
 
 def get_exp_path(problem_name: str, exp_name: str) -> Path:
