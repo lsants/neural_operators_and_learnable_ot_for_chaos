@@ -1,7 +1,7 @@
 import numpy
-from pipeline.training.train_configs import TrainConfig
+from pipeline.training.train_configs import TrainConfig, LossConfig
 
-def resolve_runtime_config(exp_cfg: TrainConfig) -> dict:
+def resolve_runtime_config(exp_cfg: TrainConfig, loss_cfg: LossConfig) -> dict:
     sample = numpy.load(exp_cfg.train_data_path, allow_pickle=True)
     traj = sample["traj_000000"]
     param = sample["params_000000"]
@@ -14,6 +14,6 @@ def resolve_runtime_config(exp_cfg: TrainConfig) -> dict:
         "emulator_output_dim": input_dim,
         "n_samples": len(sample["ids"]),
         "summary_input_dim": input_dim * n_timesteps,
-        "summary_output_dim": input_dim if \
-              exp_cfg.use_system_dims_on_summary else exp_cfg.num_summary_stats
+        "summary_output_dim": loss_cfg.num_summary_stats,
+        "summary_embedding_dim": input_dim * loss_cfg.num_summary_stats * n_timesteps
     }

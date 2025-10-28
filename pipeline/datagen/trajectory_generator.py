@@ -1,4 +1,4 @@
-import torch
+import logging
 import numpy as np
 from pathlib import Path
 from config import DataGenConfig
@@ -6,6 +6,8 @@ from scipy.integrate import solve_ivp
 from collections.abc import Callable
 from dynamical_systems import IVP_MAP
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 class DataGenerator:
     def __init__(self, config: DataGenConfig | str | dict):
@@ -27,6 +29,9 @@ class DataGenerator:
 
     def _solve_ivp(self, params: np.ndarray):
         params = self.sample_parameters()
+        logger.info("solving IVP with params: %s", params)
+        logger.info("t_start: %f, t_end: %f, dt: %f", self.config.t_start, self.config.t_end, self.config.dt)
+        logger.info("Total time steps: %d", int((self.config.t_end - self.config.t_start) / self.config.dt))
         t_span = (self.config.t_start, self.config.t_end)
         t_eval = np.arange(self.config.t_start, self.config.t_end, self.config.dt)
         init_conditions = self.rng.normal(0, 1, self.config.n_dim)
@@ -41,8 +46,11 @@ class DataGenerator:
             rtol=1e-9,
             atol=1e-12
         )
-        step = self.config.trajectory_length
+
+        step = self.config.subsample_stride
+        logger.info("Subsampling trajectory with stride: %d", step)
         trajectory = solution.y.T[::step, :]
+        logger.info("Generated trajectory shape: %s", trajectory.shape)
         return trajectory
     
     def generate_one(self, idx: int) -> tuple[str, np.ndarray, np.ndarray]:
