@@ -19,7 +19,7 @@ def train(train_config: dict, use_wandb: bool):
     model_cfg = train_config['operator_config']
     loss_cfg = train_config['loss_config']
     problem_name = get_problem_name(exp_cfg.train_data_path)
-    ot_type = loss_cfg.summary_config['type']
+    ot_type = loss_cfg.summary_config['type'] if loss_cfg.ot_penalty > 0 else 'no_ot'
     exp_name = get_exp_name(problem_name, ot_type)
     output_path = get_exp_path(problem_name, exp_name)
 
