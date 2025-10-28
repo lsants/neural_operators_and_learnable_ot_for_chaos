@@ -12,6 +12,7 @@ def plot_error_evolution(mse_per_time: np.ndarray, spectral_distance: np.ndarray
     ax.set_ylabel('MSE', fontsize=11)
     ax.set_title(title, fontsize=13)
     ax.grid(True, ls='--', alpha=0.4)
+    ax.set_yscale('log')
     
     mean_mse = np.mean(mse_per_time)
     final_mse = mse_per_time[-1]
