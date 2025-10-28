@@ -9,7 +9,7 @@
     "dist_loss": "sinkhorn",
     "optimizer_type": "adam",
     "num_summary_stats": 1,
-    "ot_penalty": 1,
+    "ot_penalty": 0,
     "feature_penalty": 0,
     "summary_step_freq": 1
 }
