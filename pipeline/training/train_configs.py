@@ -13,8 +13,6 @@ class TrainConfig:
     batch_size: int
     model_lr: float
     summary_lr: float
-    use_system_dims_on_summary: bool
-    num_summary_stats: int
     ot_delay: int 
     rollout_steps: int
     noise_level: float
@@ -41,6 +39,7 @@ class LossConfig:
     dist_loss: str
     optimizer_type: str
     ot_penalty: float
+    num_summary_stats: int
     feature_penalty: float
     summary_step_freq: int
     

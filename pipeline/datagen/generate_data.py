@@ -2,14 +2,18 @@ import argparse
 import hashlib
 import json
 import base64
+import logging
 from pathlib import Path
 from trajectory_generator import DataGenerator
 from config import DataGenConfig
 from save import save_npz
 
-def generate_data():
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def generate_data(): ## RUN FROM REPO ROOT
     parser = argparse.ArgumentParser(description="Generate dynamical system dataset")
-    parser.add_argument('--config', type=Path, default='pipeline/datagen/exp_config.json', help='Path to config JSON')
+    parser.add_argument('--config', type=Path, default='./configs/datagen/datagen_config.json', help='Path to config JSON')
     args = parser.parse_args()
 
     base_config = DataGenConfig.from_json(args.config)
@@ -19,13 +23,13 @@ def generate_data():
     for split in ['train', 'val', 'test']:
         split_config = base_config.__dict__.copy()
         if split == 'train':
-            split_config['n_samples'] = base_config.n_samples * 8 // 10
+            split_config['n_samples'] = base_config.n_samples
             split_config['output_dir'] = Path(base_config.output_dir) /base_config.experiment / exp_version / 'train_data.npz'
         elif split == 'val':
-            split_config['n_samples'] = base_config.n_samples * 1 // 10
+            split_config['n_samples'] = base_config.n_samples
             split_config['output_dir'] = Path(base_config.output_dir) /base_config.experiment / exp_version / 'val_data.npz'
         else: # test
-            split_config['n_samples'] = base_config.n_samples * 1 // 10
+            split_config['n_samples'] = base_config.n_samples
             split_config['output_dir'] = Path(base_config.output_dir) /base_config.experiment / exp_version / 'test_data.npz'
 
         split_data_gen_config = DataGenConfig(**split_config)

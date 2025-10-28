@@ -10,7 +10,7 @@ class DataGenConfig:
     t_start: float
     t_end: float
     dt: float
-    trajectory_length: int
+    subsample_stride: int
     param_ranges: dict[str, Any]
     n_dim: int
     noise_level: float
@@ -29,8 +29,8 @@ class DataGenConfig:
             raise ValueError("n_samples must be positive")
         if self.dt <= 0:
             raise ValueError("dt must be positive")
-        if self.trajectory_length <= 0:
-            raise ValueError("trajectory_length must be positive")
+        if self.subsample_stride <= 0:
+            raise ValueError("subsample_stride must be positive")
         if not self.param_ranges:
             raise ValueError("param_ranges cannot be empty")
 

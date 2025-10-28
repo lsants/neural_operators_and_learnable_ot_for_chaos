@@ -1,4 +1,5 @@
 from .base_summary import SummaryStatistic
 
 class FixedSummaryStats(SummaryStatistic):
-    pass
+    def __init__(self, ):
+        pass

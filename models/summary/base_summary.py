@@ -8,7 +8,7 @@ class SummaryStatistic(ABC, torch.nn.Module):
 
     @property
     @abstractmethod
-    def output_dim(self) -> int:
+    def summary_dim(self) -> int:
         pass
 
     @property
