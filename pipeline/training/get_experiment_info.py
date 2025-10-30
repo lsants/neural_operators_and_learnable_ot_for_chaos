@@ -24,7 +24,7 @@ def get_exp_path(problem_name: str, exp_name: str) -> Path:
     version = re.search(r'[^_]*$', exp_name)
     if version is None:
         raise ValueError(f"Could not extract version from experiment name: {exp_name}")
-    exp_path = Path("outputs") / problem_name / version.group(0)
+    exp_path = Path("outputs") / exp_name / version.group(0)
     return exp_path
 
 def get_dataset_config(train_data_path: str) -> dict[str, Any]:

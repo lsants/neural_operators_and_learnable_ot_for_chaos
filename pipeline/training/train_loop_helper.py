@@ -2,22 +2,35 @@ import wandb
 import torch
 import numpy as np
 from typing import Callable
-from pipeline.visualization import plot_1d_components_comparison, plot_3d_trajectories_comparison, plot_summary_stats_comparison, plot_error_evolution
+from pipeline.visualization import plot_l63_full_double, plot_summary_stats_comparison, plot_error_evolution
 from matplotlib import pyplot as plt
-from .get_experiment_info import get_dataset_config
-from pipeline.metric_bookkeping.compute_metrics import compute_trajectory_errors, compute_summary_errors
 
+from pipeline.visualization.lorentz63_plots import plot_l63_full_double, plot_l63_full_single
+from .get_experiment_info import get_dataset_config
+from pipeline.testing.metrics import compute_trajectory_errors, compute_summary_errors
+from torch.nn.utils.clip_grad import clip_grad_norm_
 
 def optimize_ot(epoch: int, ot_delay: int, summary_step_freq: int) -> bool:
-    optimize = (epoch > ot_delay) and (epoch % summary_step_freq == 0) and epoch < 27
+    optimize = (epoch > ot_delay) and (epoch % summary_step_freq == 0)
     return optimize
 
 def normalize(s: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
-    mean = s.mean(dim=1, keepdim=True)
+    # d: state space dimension 3 for L63
+    # n: summary statistics dimension
+    # Original traj: u = [B, T, d]
+    # Draft Summary stats: s = [B, T, n]
+    # for l96: s = [B, T, "X", n]?
+
+    # L63:
+    # x: σ(y - x)
+    # y: x(ρ - z) - y
+    # z: xy - βz
+
+    mean = s.mean(dim=1, keepdim=True) # s = [B, T, n]; 3 as R^3. ; f: [T*3] -> [T*3*n]. reshape [[B, T*3, n=1]]
     std = s.std(dim=1, keepdim=True) + eps
     s_normalized = (s - mean) / std
-    s_mean = s.mean(dim=1, keepdim=True)
-    return s_mean / std # Testing because OT loss was negative when using full normalized features
+    # s_mean = s.mean(dim=1, keepdim=True) / std
+    return s_normalized # Testing because OT loss was negative when using full normalized features
 
 def rollout(
     emulator: torch.nn.Module,
@@ -132,7 +145,8 @@ def train_step(
     λ_ot: float,
     rollout_steps: int,
     use_ot: bool,
-    step_f_φ: bool
+    step_f_φ: bool,
+    clip_summary_grad_norm: float
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, float, float, float]:
 
     model.train()
@@ -140,7 +154,6 @@ def train_step(
         f_φ.train()
 
     model_optimizer.zero_grad()
-
     u_hat, Lp_batch = rollout_with_short_horizon(
         emulator=model, u=u, param=param, loss_fn=Lp, short_horizon=rollout_steps)
 
@@ -153,7 +166,7 @@ def train_step(
             s = s.unsqueeze(1)
             s_hat = s_hat.unsqueeze(1)
             
-        ot_c_φ_batch = ot_c_φ(normalize(s), normalize(s_hat))
+        ot_c_φ_batch = ot_c_φ(normalize(s), normalize(s_hat)) # s: [B, T*d , n] 
 
         model_loss = Lp_batch + λ_ot * ot_c_φ_batch
         
@@ -176,6 +189,7 @@ def train_step(
 
         if step_f_φ and f_φ.is_learnable:
             summary_loss.backward()
+            clip_grad_norm_(f_φ.parameters(), max_norm=clip_summary_grad_norm)
             summary_optimizer.step()
     else:
         with torch.no_grad():
@@ -210,12 +224,26 @@ def log_trajectory_visualizations(u_sample: np.ndarray,
         'errors/trajectory_rmse': traj_errors['rmse'],
         'errors/trajectory_mae': traj_errors['mae'],
         'errors/trajectory_l2': traj_errors['l2_error'],
-        'errors/trajectory_max': traj_errors['max_error'],
+        'errors/trajectory_l1': traj_errors['l1_error'],
+        'errors/trajectory_l_infinity': traj_errors['l_infinity_error'],
+        'errors/trajectory_energy_spectrum': traj_errors['energy_spectrum'],
+        'errors/trajectory_histogram_error': traj_errors['histogram_error'],
         'errors/trajectory_mse_x': traj_errors['mse_per_component'][0],
         'errors/trajectory_mse_y': traj_errors['mse_per_component'][1],
         'errors/trajectory_mse_z': traj_errors['mse_per_component'][2],
-        'errors/summary_mse': summary_errors['summary_mse'],
-        'errors/summary_mae': summary_errors['summary_mae'],
+        'errors/trajectory_mae_x': traj_errors['mae_per_component'][0],
+        'errors/trajectory_mae_y': traj_errors['mae_per_component'][1],
+        'errors/trajectory_mae_z': traj_errors['mae_per_component'][2],
+        'errors/trajectory_rmse_x': traj_errors['rmse_per_component'][0],
+        'errors/trajectory_rmse_y': traj_errors['rmse_per_component'][1],
+        'errors/trajectory_rmse_z': traj_errors['rmse_per_component'][2],
+        'errors/summary_mse': summary_errors['mse'],
+        'errors/summary_mae': summary_errors['mae'],
+        'errors/summary_energy_spectrum': summary_errors['energy_spectrum'],
+        'errors/summary_histogram_error': summary_errors['histogram_error'],
+        'errors/summary_l1': summary_errors['l1_error'],
+        'errors/summary_l2': summary_errors['l2_error'],
+        'errors/summary_l_infinity': summary_errors['l_infinity_error'],
         'epoch': epoch,
         'step': global_step
     })
@@ -225,31 +253,35 @@ def log_trajectory_visualizations(u_sample: np.ndarray,
     s_true_np = s_sample[0]
     s_hat_np = s_hat_sample[0]
 
-    fig_3d = plot_3d_trajectories_comparison(
-        u_true=u_true_np, u_pred=u_hat_np,
-        title=f"3D Trajectory (epoch {epoch})",
+    fig_traj = plot_l63_full_single(
+        trajectory=u_hat_np,
+        plotted_variable=f"${{\\hat{{u}}}}(t)$",
     )
-    fig_1d = plot_1d_components_comparison(
-        u_true=u_true_np, u_pred=u_hat_np, dt=dataset_config['dt'],
-        title=f"Component-wise comparison (epoch {epoch})",
+    fig_traj_comp = plot_l63_full_double(
+        traj1=u_hat_np, traj2=u_true_np,
+        first=[r'$x(t)$_pred', r'$y(t)$_pred', r'$z(t)$_pred'],
+        second=[r'$x(t)$_true', r'$y(t)$_true', r'$z(t)$_true'],
+        plotted_variable_1=f"${{\\hat{{u}}}}(t)$",
+        plotted_variable_2=r'$u(t)$',
     )
     fig_summary_stats = plot_summary_stats_comparison(
         s_true=s_true_np, s_pred=s_hat_np,
         title=f"Summary Statistics Comparison (epoch {epoch})",
     )
     fig_error = plot_error_evolution(traj_errors['mse_per_time'],
-                                     traj_errors['spectral_distance'],
                                       title=f"Error Evolution (Epoch {epoch})")
 
     wandb.log({
-        'visualizations/3d_trajectory': wandb.Image(fig_3d),
-        'visualizations/1d_trajectory': wandb.Image(fig_1d),
+        'visualizations/trajectories': wandb.Image(fig_traj),
+        'visualizations/traj_comparison': wandb.Image(fig_traj_comp),
         'visualizations/summary_stats': wandb.Image(fig_summary_stats),
         'visualizations/error_evolution': wandb.Image(fig_error),
         'batch/step': global_step,
         'batch/epoch': epoch,
     })
-    plt.close(fig_3d)
-    plt.close(fig_1d)
+    plt.close(fig_traj)
+    plt.close(fig_traj_comp)
     plt.close(fig_summary_stats)
     plt.close(fig_error)
+
+ 

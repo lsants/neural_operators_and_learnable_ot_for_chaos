@@ -16,10 +16,8 @@ logger = logging.getLogger(__file__)
 
 def train(train_config: dict, use_wandb: bool):
     exp_cfg = train_config['exp_config']
-    model_cfg = train_config['operator_config']
-    loss_cfg = train_config['loss_config']
     problem_name = get_problem_name(exp_cfg.train_data_path)
-    ot_type = loss_cfg.summary_config['type'] if loss_cfg.ot_penalty > 0 else 'no_ot'
+    ot_type = exp_cfg.summary_config['type'] if exp_cfg.ot_penalty > 0 else 'no_ot'
     clean_or_noisy = 'noisy' if exp_cfg.noise_level > 0 else 'clean'
     exp_name = get_exp_name(problem_name, ot_type, clean_or_noisy)
     output_path = get_exp_path(problem_name, exp_name)
@@ -37,11 +35,11 @@ def train(train_config: dict, use_wandb: bool):
                 'dtype': exp_cfg.dtype,
                 'epochs': exp_cfg.epochs,
                 'batch_size': exp_cfg.batch_size,
-                'model_lr': exp_cfg.model_lr,
+                'emulator_lr': exp_cfg.emulator_lr,
                 'summary_lr': exp_cfg.summary_lr,
-                'short_term_loss': loss_cfg.short_term_loss,
-                'dist_loss': loss_cfg.dist_loss,
-                'ot_penalty': loss_cfg.ot_penalty,
+                'short_term_loss': exp_cfg.short_term_loss,
+                'distribution_loss': exp_cfg.distribution_loss,
+                'ot_penalty': exp_cfg.ot_penalty,
                 'noise_level': exp_cfg.noise_level,
                 'rollout_steps': exp_cfg.rollout_steps,
                 'crop_window_size': exp_cfg.crop_window_size,
@@ -67,17 +65,24 @@ def train(train_config: dict, use_wandb: bool):
         pin_memory=(device.type == 'cpu')
     )
 
-    runtime = resolve_runtime_config(exp_cfg, loss_cfg)
+    # Lorenz63: [B, T, d] = [1, 100, 3]
+    # dim summary: n = 2
+    # f: [T, d] -> [T*d, n]
+    # Rede pega vetor T*d [300] -> T*d* n [600]
 
-    model = initialize_operator(operator_config=model_cfg, device=device, dtype=dtype, runtime=runtime)
-    Lp = initialize_loss_function(loss_config=loss_cfg.short_term_loss)
-    ot_c_φ = initialize_loss_function(loss_config=loss_cfg.dist_loss)
-    λ_ot = loss_cfg.ot_penalty
-    model_optimizer = initialize_optimizer(model=model, learning_rate=exp_cfg.model_lr, optimizer_type=model_cfg.optimizer_type)
-    f_φ = initialize_summary_stats(summary_config=loss_cfg.summary_config, device=device, dtype=dtype, runtime=runtime)
-    
+    # Make the runtime variable modify the exp and loss configs instead of creating another one
+
+    resolve_runtime_config(exp_cfg)
+
+    model = initialize_operator(operator_config=exp_cfg.emulator_config, device=device, dtype=dtype)
+    Lp = initialize_loss_function(loss_config=exp_cfg.short_term_loss)
+    ot_c_φ = initialize_loss_function(loss_config=exp_cfg.distribution_loss)
+    λ_ot = exp_cfg.ot_penalty
+    model_optimizer = initialize_optimizer(model=model, learning_rate=exp_cfg.emulator_lr, optimizer_type=exp_cfg.emulator_optimizer_type)
+    f_φ = initialize_summary_stats(summary_config=exp_cfg.summary_config, device=device, dtype=dtype)
+
     if f_φ.is_learnable:
-        summary_optimizer = initialize_optimizer(model=f_φ, learning_rate=exp_cfg.summary_lr, optimizer_type=loss_cfg.optimizer_type)
+        summary_optimizer = initialize_optimizer(model=f_φ, learning_rate=exp_cfg.summary_lr, optimizer_type=exp_cfg.summary_optimizer_type)
     else:
         summary_optimizer = None
 
@@ -103,9 +108,9 @@ def train(train_config: dict, use_wandb: bool):
         for batch_idx, (_, u, param) in enumerate(pbar):
             use_ot = (epoch > exp_cfg.ot_delay)
 
-            optimize = optimize_ot(epoch=epoch, ot_delay=exp_cfg.ot_delay, summary_step_freq=loss_cfg.summary_step_freq)
+            optimize = optimize_ot(epoch=epoch, ot_delay=exp_cfg.ot_delay, summary_step_freq=exp_cfg.summary_step_freq)
             
-            print(f"Epoch {epoch+1} Batch {batch_idx+1}/{len(dataloader)} - Use OT: {use_ot}, loss_cfg.summary_step_freq: {loss_cfg.summary_step_freq}, Optimize ot: {optimize}")
+            # print(f"Epoch {epoch+1} Batch {batch_idx+1}/{len(dataloader)} - Use OT: {use_ot}, exp_cfg.summary_step_freq: {exp_cfg.summary_step_freq}, Optimize ot: {optimize}")
 
             u_hat, s, s_hat, total_loss, Lp_val, ot_c_φ_val = train_step(
                 model=model,
@@ -119,7 +124,8 @@ def train(train_config: dict, use_wandb: bool):
                 λ_ot=λ_ot,
                 rollout_steps=exp_cfg.rollout_steps,
                 use_ot=use_ot,
-                step_f_φ=optimize_ot(epoch=epoch, ot_delay=exp_cfg.ot_delay, summary_step_freq=loss_cfg.summary_step_freq)
+                step_f_φ=optimize_ot(epoch=epoch, ot_delay=exp_cfg.ot_delay, summary_step_freq=exp_cfg.summary_step_freq),
+                clip_summary_grad_norm=exp_cfg.clip_summary_grad_norm
             )
 
 
@@ -136,15 +142,7 @@ def train(train_config: dict, use_wandb: bool):
                     'batch/step': global_step,
                     'batch/epoch': epoch,
                 })
-            u_sample = u.detach().cpu().numpy()
-            u_hat_sample = u_hat.detach().cpu().numpy()
-            s_sample = s.detach().cpu().numpy()
-            s_hat_sample = s_hat.detach().cpu().numpy()
-            from pipeline.visualization.lorentz63_plots import (plot_summary_stats_comparison)
-            fig_summary_stats = plot_summary_stats_comparison(
-                    s_true=s_sample[0], s_pred=s_hat_sample[0],
-                    title=f"Summary Statistics Comparison (epoch {epoch})",
-                )
+
             if use_wandb and global_step % 10 == 0:
                 u_sample = u.detach().cpu().numpy()
                 u_hat_sample = u_hat.detach().cpu().numpy()
@@ -188,11 +186,16 @@ def train(train_config: dict, use_wandb: bool):
         if (epoch + 1) % 10 == 0:
             checkpoint = {
                 'epoch': epoch,
+                'emulator_config': exp_cfg.emulator_config,
+                'summary_config': exp_cfg.summary_config,
                 'model_state_dict': model.state_dict(),
                 'summary_state_dict': f_φ.state_dict(),
                 'model_optimizer_state_dict': model_optimizer.state_dict(),
                 'summary_optimizer_state_dict': summary_optimizer.state_dict() if f_φ.is_learnable else None,
                 'loss': epoch_metrics['train/total_loss'],
+                'dataset_info': {
+                    'name'
+                }
             }
             
             if f_φ.is_learnable:

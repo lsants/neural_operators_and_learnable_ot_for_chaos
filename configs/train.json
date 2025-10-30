@@ -3,12 +3,33 @@
     "val_data_path": "data/lorenz63/05249b94/val_data.npz",
     "device": "cpu",
     "dtype": "float32",
-    "epochs": 200,
+    "epochs": 1000,
     "batch_size": 4,
-    "model_lr": 0.001,
-    "summary_lr": 0.001,
     "ot_delay": 20,
     "rollout_steps": 2,
-    "noise_level": 0.1,
-    "crop_window_size": 10000
+    "noise_level": 0.01,
+    "crop_window_size": 500,
+    "summary_step_freq": 10,
+    "clip_summary_grad_norm": 1.0,
+
+    "emulator_config": {
+        "type": "mlp"
+    },
+    "emulator_optimizer_type": "adam",
+    "emulator_lr": 0.001,
+
+    "summary_config": {
+        "type": "mlp",
+        "num_summary_stats": 3
+    },
+    "summary_optimizer_type": "adam",
+    "summary_lr": 0.001,
+    
+    "distribution_loss": "sinkhorn",
+    "short_term_loss": "l2",
+    "ot_penalty": 1,
+    "feature_penalty": 0,
+    "geom_loss_p": 2,
+    "blur": 0.05,
+    "p_norm": 2
 }

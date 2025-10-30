@@ -23,13 +23,9 @@ pick_port() {
 # ------------------------------------------------------------------- #
 TRAIN_CFG="$(realpath configs/train.json)"
 EVAL_CFG="$(realpath configs/eval.json)"
-OP_CFG="$(realpath configs/operator.json)"
-LOSS_CFG="$(realpath configs/loss.json)"
 
 COMMON_ARGS=(
     --train-config   "$TRAIN_CFG"
-    --operator-config "$OP_CFG"
-    --loss-config      "$LOSS_CFG"
 )
 
 # ------------------------------------------------------------------ #
