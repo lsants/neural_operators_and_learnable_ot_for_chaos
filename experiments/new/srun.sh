@@ -65,7 +65,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     echo "Running locally on macOS (single GPU/CPU)"
     python main.py \
         "${COMMON_ARGS[@]}" \
-        # --eval-config "$EVAL_CFG" --run-eval   # uncomment if you want eval locally
+        --eval-config "$EVAL_CFG" --run-eval   # uncomment if you want eval locally
 else
     echo "Unsupported OS: $OSTYPE"
     exit 1
