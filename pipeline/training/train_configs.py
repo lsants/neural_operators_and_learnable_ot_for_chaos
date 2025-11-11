@@ -34,6 +34,7 @@ class TrainConfig:
     distribution_loss: str
     short_term_loss: str
     ot_penalty: float
+    ot_penalty_increase: float
     feature_penalty: float
     geom_loss_p: int
     blur: float
@@ -43,7 +44,7 @@ class TrainConfig:
     def post_init(self):
         pass
 
-def get_train_configs(config_paths: list[Path]):
+def get_train_configs(config_paths: list[Path]) -> dict[str, TrainConfig]:
     with open(config_paths[0], 'r') as f:
         train_config_dict = json.load(f)
         train_config_obj = TrainConfig(**train_config_dict)
