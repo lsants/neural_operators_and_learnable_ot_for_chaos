@@ -28,7 +28,6 @@ class DataGenerator:
         return np.stack(params, axis=-1)
 
     def _solve_ivp(self, params: np.ndarray):
-        params = self.sample_parameters()
         logger.info("solving IVP with params: %s", params)
         logger.info("t_start: %f, t_end: %f, dt: %f", self.config.t_start, self.config.t_end, self.config.dt)
         logger.info("Total time steps: %d", int((self.config.t_end - self.config.t_start) / self.config.dt))
@@ -42,7 +41,7 @@ class DataGenerator:
             y0=init_conditions,
             args=tuple(params),
             t_eval=t_eval,
-            method='LSODA',
+            method='RK45',
             rtol=1e-9,
             atol=1e-12
         )
@@ -67,8 +66,3 @@ class DataGenerator:
 
         results = [self.generate_one(i) for i in iterator]
         return results
-    
-    def save_trajectory(self, trajectory: np.ndarray, parameters: np.ndarray):
-        output_dir = Path(self.config.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        traj_id = len(list(output_dir.glob('*.npy')))
