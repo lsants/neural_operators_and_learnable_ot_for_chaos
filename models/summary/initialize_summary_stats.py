@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from .mlp_summary import MLPSummaryStats
 from .fixed_summary import FixedSummaryStats
+from .projection_summary import ProjectionSummaryStats
 from .identity_summary import IdentitySummaryStats
 from models.architectures.activation_fns import ACTIVATION_MAP
 
@@ -19,6 +20,10 @@ SUMMARY_REGISTRY = {
     'identity': {
         'class': IdentitySummaryStats,
         'config_path': None
+    },
+    'projection': {
+        'class': ProjectionSummaryStats,
+        'config_path': 'configs/summary_statistics/projection.json'
     },
 }
 
@@ -56,6 +61,11 @@ def initialize_summary_stats(
         arch_config = load_summary_config(config_path)
         arch_config['input_dim'] = summary_config['input_dim']
         arch_config['output_dim'] = summary_config['output_dim']
+        if summary_config['type'] == 'projection':
+            summary_config.pop('input_dim')
+            summary_config.pop('output_dim')
+            arch_config.pop('input_dim')
+            arch_config.pop('output_dim')
         summary_config.pop('type')
         summary_config.update(**arch_config)
 
@@ -76,9 +86,7 @@ if __name__ == "__main__":
         'type': 'identity'
     }
     summary_stats = initialize_summary_stats(
-        summary_config,
+        summary_config=summary_config,
         device=device,
         dtype=dtype,
-        runtime=runtime
     )
-    print(summary_stats)
