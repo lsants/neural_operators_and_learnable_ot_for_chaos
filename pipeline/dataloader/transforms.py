@@ -18,14 +18,19 @@ class AddNoiseTransform(Transform):
         return traj + noise
     
 class CropTransform(Transform):
-    def __init__(self, length: int):
-        self.length = length
+    def __init__(self, length: int | None = None):
+        if not length:
+            self.length = None
+        else:
+            self.length = length
 
     def __call__(self, traj_id: str, traj: torch.Tensor, params: torch.Tensor) -> torch.Tensor:
+        if self.length is None:
+            return traj
         return traj[:self.length]
 
 class NormalizeTransform(Transform):
-    def __init__(self, stats_path: str = None, mean: torch.Tensor = None, std: torch.Tensor = None):
+    def __init__(self, stats_path: str | None = None, mean: torch.Tensor | None = None, std: torch.Tensor | None = None):
         """
         Normalize trajectories using provided mean and std, or load from stats file.
         Args:
