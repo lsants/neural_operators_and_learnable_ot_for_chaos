@@ -1,10 +1,10 @@
+from glm import isnan
 import wandb
 import torch
 import numpy as np
 from typing import Callable
 from pipeline.visualization import plot_l63_full_double, plot_summary_stats_comparison, plot_error_evolution
 from matplotlib import pyplot as plt
-
 from pipeline.visualization.lorentz63_plots import plot_l63_full_double, plot_l63_full_single
 from .get_experiment_info import get_dataset_config
 from pipeline.testing.metrics import compute_trajectory_errors, compute_summary_errors
@@ -14,63 +14,44 @@ def optimize_ot(epoch: int, ot_delay: int, summary_step_freq: int) -> bool:
     optimize = (epoch > ot_delay) and (epoch % summary_step_freq == 0)
     return optimize
 
+def increase_λ_ot(epoch: int, ot_delay: int, λ_ot: float, λ_ot_increase: float) -> float:
+    if epoch > ot_delay and (epoch % 10 == 0):
+        λ_ot += λ_ot_increase
+    return λ_ot
+
 def normalize(s: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
-    # d: state space dimension 3 for L63
-    # n: summary statistics dimension
-    # Original traj: u = [B, T, d]
-    # Draft Summary stats: s = [B, T, n]
-    # for l96: s = [B, T, "X", n]?
-
-    # L63:
-    # x: σ(y - x)
-    # y: x(ρ - z) - y
-    # z: xy - βz
-
-    mean = s.mean(dim=1, keepdim=True) # s = [B, T, n]; 3 as R^3. ; f: [T*3] -> [T*3*n]. reshape [[B, T*3, n=1]]
-    std = s.std(dim=1, keepdim=True) + eps
+    mean = s.mean(dim=(0,1), keepdim=True) # s = [B, T, n]; 3 as R^3. ; f: [T*3] -> [T*3*n]. reshape [[B, T*3, n=1]]
+    std = s.std(dim=(0,1), keepdim=True).clamp_min(eps)
     s_normalized = (s - mean) / std
     # s_mean = s.mean(dim=1, keepdim=True) / std
-    return s_normalized # Testing because OT loss was negative when using full normalized features
+    return s_normalized
 
 def rollout(
     emulator: torch.nn.Module,
     u: torch.Tensor,
     param: torch.Tensor,
-    rollout_steps: int,
+    rollout_steps: int|None = None,
 ) -> torch.Tensor:
-    
-    batch_size, total_time_steps, spatial_dim = u.shape
-    ic_indices = torch.arange(0, total_time_steps, rollout_steps, device=u.device)
-    add_final_step = (ic_indices[-1] != total_time_steps - 1)
-    if not add_final_step and len(ic_indices) > 1:
-        ic_indices = ic_indices[:-1]
+    """Full rollout of the emulator.
 
-    num_ics = len(ic_indices)
+    Args:
+        emulator (torch.nn.Module): Emulator of the dynamics.
+        u (torch.Tensor): Data tensor of shape (B, T, d).
+        param (torch.Tensor): Parameters for the emulator (problem dependent).
 
-    u_ics = u[:, ic_indices]
+    Returns:
+        torch.Tensor: Rollout predictions of shape (B, T, d).
+    """
+    B, T, U = u.shape
+    u_hat = torch.zeros((B, T, U), dtype=u.dtype, device=u.device)
+    u_hat[:, 0, :] = u[:, 0, :]
+    steps = T if rollout_steps is None else rollout_steps
+    for t in range(1, steps):
+        u_hat[:, t, :] = emulator(u_hat[:, t-1, :], param)
 
-    current_state = u_ics.reshape(batch_size * num_ics, spatial_dim)
-    params_expanded = param.repeat_interleave(num_ics, dim=0)
-    
-    prediction_list = [u_ics]
+    return u_hat
 
-    for step in range(rollout_steps - 1):
-        next_state = emulator(current_state, params_expanded)
-        prediction_list.append(next_state.reshape(batch_size, num_ics, spatial_dim))
-        current_state = next_state
-
-    predictions = torch.stack(prediction_list, dim=2)
-    predictions = predictions.reshape(batch_size, -1, spatial_dim)
-
-    if add_final_step:
-        predictions = torch.cat([predictions, u[:, total_time_steps - 1 : total_time_steps, :]], dim=1)
-
-    predictions = predictions[:, :total_time_steps, :]
-    assert predictions.shape == u.shape, f"Shape mismatch: {predictions.shape} vs {u.shape}"
-
-    return predictions
-
-def rollout_with_short_horizon(
+def anchored_rollout_with_short_horizon(
     emulator: torch.nn.Module,
     u: torch.Tensor,
     param: torch.Tensor,
@@ -154,18 +135,35 @@ def train_step(
         f_φ.train()
 
     model_optimizer.zero_grad()
-    u_hat, Lp_batch = rollout_with_short_horizon(
-        emulator=model, u=u, param=param, loss_fn=Lp, short_horizon=rollout_steps)
+
+    u_hat_full_rollout = rollout(
+        emulator=model, u=u, param=param)
+    
+    u_hat_anchored, Lp_batch = anchored_rollout_with_short_horizon(
+        emulator=model,
+        u=u,
+        param=param,
+        loss_fn=Lp,
+        short_horizon=rollout_steps
+    )
+
+    # u_hat_traj = rollout(
+    #     emulator=model, u=u, param=param, rollout_steps=rollout_steps
+    # )
+
+    # Lp_batch = Lp(u, u_hat_traj)
 
     if use_ot:
-        with torch.no_grad():
-            s = f_φ(u)
-            s_hat = f_φ(u_hat)
+        s = f_φ(u)
+        s_hat = f_φ(u_hat_full_rollout)
+        s_hat = s_hat
 
         if s.dim() == 2:
             s = s.unsqueeze(1)
             s_hat = s_hat.unsqueeze(1)
             
+        if torch.isnan(s).any() or torch.isnan(s_hat).any():
+            print(f"[Warning] NaN detected in summaries")
         ot_c_φ_batch = ot_c_φ(normalize(s), normalize(s_hat)) # s: [B, T*d , n] 
 
         model_loss = Lp_batch + λ_ot * ot_c_φ_batch
@@ -175,14 +173,20 @@ def train_step(
         model_loss = Lp_batch
         ot_c_φ_batch = torch.tensor(0.0)
 
+    for p in f_φ.parameters():
+        p.requires_grad = False
+
     model_loss.backward()
     model_optimizer.step()
+
+    for p in f_φ.parameters():
+        p.requires_grad = True
 
     if use_ot:
         if f_φ.is_learnable:
             summary_optimizer.zero_grad()
         s = f_φ(u)
-        u_hat_detached = u_hat.detach()
+        u_hat_detached = u_hat_full_rollout.detach()
         s_hat = f_φ(u_hat_detached)
         ot_c_φ_batch = ot_c_φ(normalize(s), normalize(s_hat))
         summary_loss = -ot_c_φ_batch
@@ -194,12 +198,12 @@ def train_step(
     else:
         with torch.no_grad():
             s = f_φ(u)
-            u_hat_detached = u_hat.detach()
+            u_hat_detached = u_hat_full_rollout.detach()
             s_hat = f_φ(u_hat_detached)
             ot_c_φ_batch = torch.tensor(0.0)
 
     return (
-        u_hat,
+        u_hat_full_rollout,
         s,
         s_hat,
         model_loss.item(),
