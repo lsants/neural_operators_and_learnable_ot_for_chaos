@@ -2,7 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 from pipeline.training import train, get_train_configs
-# from pipeline.testing import evaluate, get_eval_configs
+from pipeline.testing import get_eval_configs, eval_exp
 
 logger = logging.getLogger(__file__)
 
@@ -22,16 +22,15 @@ def main():
             args.train_config, 
         ]
     )
-    # eval_config = get_eval_configs(args.eval_config)
 
-    train(train_config, use_wandb=True)
+    exp_path = train(train_config, use_wandb=False)
 
     # --------- Optional Evaluation --------------
     if args.run_eval:
             if args.eval_config is None:
                 raise ValueError("--eval-config is required when --run-eval is used")
-            # eval_cfg = get_eval_configs(args.eval_config)
-            # evaluate(eval_cfg)
+            eval_cfg = get_eval_configs( args.eval_config, exp_path)
+            eval_exp(eval_cfg)
 
 if __name__ == '__main__':
     main()
