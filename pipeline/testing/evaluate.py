@@ -2,7 +2,6 @@ import os
 import torch
 import wandb
 import numpy as np
-import matplotlib.pyplot as plt
 from manim import config
 from pathlib import Path
 from models.operator.mlp_timestepper import TimeStepperMLP

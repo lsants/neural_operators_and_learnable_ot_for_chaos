@@ -16,7 +16,8 @@ def optimize_ot(epoch: int, ot_delay: int, summary_step_freq: int) -> bool:
 
 def increase_λ_ot(epoch: int, ot_delay: int, λ_ot: float, λ_ot_increase: float) -> float:
     if epoch > ot_delay and (epoch % 10 == 0):
-        λ_ot += λ_ot_increase
+        if λ_ot > 0.0:
+            λ_ot += λ_ot_increase
     return λ_ot
 
 def normalize(s: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
