@@ -1,3 +1,4 @@
+import operator
 import torch
 import json
 from pathlib import Path
@@ -22,7 +23,6 @@ OPERATOR_REGISTRY = {
 
 def load_operator_config(config_path: str) -> dict[str, Any]:
     path = Path(config_path)
-    print(path)
     if not path.exists():
         raise FileNotFoundError(f"Operator config not found: {config_path}")
     
@@ -30,13 +30,8 @@ def load_operator_config(config_path: str) -> dict[str, Any]:
         config = json.load(f)
     return config
 
-def process_arch_json(config: dict) -> dict[str, Any]:
-    if 'activation' in config:
-        config['activation'] = ACTIVATION_MAP[config['activation']]
-    return config
-
-def initialize_operator(operator_config, device: torch.device, dtype: torch.dtype, **kwargs):
-    operator_type = operator_config.operator_type.lower()
+def initialize_operator(operator_config, device: torch.device, dtype: torch.dtype):
+    operator_type = operator_config['type'].lower()
 
     if operator_type not in OPERATOR_REGISTRY:
         raise ValueError(
@@ -54,13 +49,13 @@ def initialize_operator(operator_config, device: torch.device, dtype: torch.dtyp
         )
     
     arch_config = load_operator_config(config_path)
-    arch_config['input_dim'] = kwargs['runtime']['emulator_input_dim']
-    arch_config['output_dim'] = kwargs['runtime']['emulator_output_dim']
-    processed_arch_config = process_arch_json(arch_config)
-    
-    print(processed_arch_config)
+    arch_config['input_dim'] = operator_config['input_dim']
+    arch_config['output_dim'] = operator_config['output_dim']
+    operator_config.pop('type')
+    operator_config.update(**arch_config)
 
-    model = operator_class(**processed_arch_config)
+
+    model = operator_class(**operator_config)
     model = model.to(device=device, dtype=dtype)
 
     return model

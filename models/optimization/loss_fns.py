@@ -6,7 +6,7 @@ class SinkhornDivergence:
         self.loss = SamplesLoss(loss='sinkhorn', p=p, blur=blur, debias=True, backend=backend)
 
     def __call__(self, u_i: torch.Tensor, u_hat_i: torch.Tensor) -> torch.Tensor:
-        return torch.mean(self.loss(u_i, u_hat_i)) + 1e-12 # Maybe take the mean?
+        return torch.mean(self.loss(u_i, u_hat_i)) + 1e-12
 
 class LpNorm:
     def __init__(self, p: float):

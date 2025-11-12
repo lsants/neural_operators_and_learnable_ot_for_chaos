@@ -6,8 +6,34 @@ def eval_rollout(
     emulator: torch.nn.Module,
     u: torch.Tensor,
     param: torch.Tensor,
+    rollout_steps: int|None = None,
+) -> torch.Tensor:
+    """Full rollout of the emulator.
+
+    Args:
+        emulator (torch.nn.Module): Emulator of the dynamics.
+        u (torch.Tensor): Data tensor of shape (B, T, d).
+        param (torch.Tensor): Parameters for the emulator (problem dependent).
+
+    Returns:
+        torch.Tensor: Rollout predictions of shape (B, T, d).
+    """
+    emulator.eval()
+    B, T, U = u.shape
+    u_hat = torch.zeros((B, T, U), dtype=u.dtype, device=u.device)
+    u_hat[:, 0, :] = u[:, 0, :]
+    steps = T if rollout_steps is None else rollout_steps
+    for t in range(1, steps):
+        u_hat[:, t, :] = emulator(u_hat[:, t-1, :], param)
+
+    return u_hat
+
+@torch.no_grad()
+def eval_anchor_rollout(
+    emulator: torch.nn.Module,
+    u: torch.Tensor,
+    param: torch.Tensor,
     rollout_steps: int,
-    loss_fn: Callable | None = None
 ) -> torch.Tensor | tuple[torch.Tensor, float]:
     emulator.eval()
     pred = u.unsqueeze(1) # [B, 1, D]
@@ -20,11 +46,8 @@ def eval_rollout(
         current = next_state
     predictions = torch.cat(predictions, dim=1)  # [B, T, D]
 
-    if loss_fn is not None:
-        loss = loss_fn(u, predictions)
-        return predictions, loss
-    else:
-        return predictions
+
+    return predictions
     
 def summary_rollout(
     f_φ: torch.nn.Module,

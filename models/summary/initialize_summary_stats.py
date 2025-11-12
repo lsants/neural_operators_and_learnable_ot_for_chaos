@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 from .mlp_summary import MLPSummaryStats
 from .fixed_summary import FixedSummaryStats
+from .projection_summary import ProjectionSummaryStats
 from .identity_summary import IdentitySummaryStats
 from models.architectures.activation_fns import ACTIVATION_MAP
 
@@ -20,6 +21,10 @@ SUMMARY_REGISTRY = {
         'class': IdentitySummaryStats,
         'config_path': None
     },
+    'projection': {
+        'class': ProjectionSummaryStats,
+        'config_path': 'configs/summary_statistics/projection.json'
+    },
 }
 
 def load_summary_config(config_path: str) -> dict[str, Any]:
@@ -31,16 +36,10 @@ def load_summary_config(config_path: str) -> dict[str, Any]:
         config = json.load(f)
     return config
 
-def process_arch_json(config: dict) -> dict[str, Any]:
-    if 'activation' in config:
-        config['activation'] = ACTIVATION_MAP[config['activation']]
-    return config
-
 def initialize_summary_stats(
         summary_config,
         device: torch.device,
         dtype: torch.dtype,
-        **kwargs
 ):
 
     summary_type = summary_config['type']
@@ -56,15 +55,21 @@ def initialize_summary_stats(
     if config_path is None:
         module = summary_class()
         module = module.to(device=device, dtype=dtype)
+        summary_config.clear()
         return module
     else:
         arch_config = load_summary_config(config_path)
-        arch_config['input_dim'] = kwargs['runtime']['summary_input_dim']
-        arch_config['output_dim'] = kwargs['runtime']['summary_output_dim']
-        arch_config['embedding_dim'] = kwargs['runtime']['summary_embedding_dim']
-        processed_arch_config = process_arch_json(arch_config)
+        arch_config['input_dim'] = summary_config['input_dim']
+        arch_config['output_dim'] = summary_config['output_dim']
+        if summary_config['type'] == 'projection':
+            summary_config.pop('input_dim')
+            summary_config.pop('output_dim')
+            arch_config.pop('input_dim')
+            arch_config.pop('output_dim')
+        summary_config.pop('type')
+        summary_config.update(**arch_config)
 
-    module = summary_class(**processed_arch_config)
+    module = summary_class(**summary_config)
     module = module.to(device=device, dtype=dtype)
 
     return module
@@ -81,9 +86,7 @@ if __name__ == "__main__":
         'type': 'identity'
     }
     summary_stats = initialize_summary_stats(
-        summary_config,
+        summary_config=summary_config,
         device=device,
         dtype=dtype,
-        runtime=runtime
     )
-    print(summary_stats)

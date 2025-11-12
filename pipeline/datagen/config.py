@@ -13,13 +13,14 @@ class DataGenConfig:
     subsample_stride: int
     param_ranges: dict[str, Any]
     n_dim: int
-    noise_level: float
     output_dir: Path
+    n_timesteps: int
 
     @classmethod
     def from_json(cls, json_path: Path | str) -> "DataGenConfig":
         with open(json_path, 'r') as f:
             data = json.load(f)
+            data['n_timesteps'] = int((data['t_end'] - data['t_start']) / data['dt'] / data['subsample_stride'])
         return cls(**data)
     
     def __post_init__(self):
@@ -33,4 +34,5 @@ class DataGenConfig:
             raise ValueError("subsample_stride must be positive")
         if not self.param_ranges:
             raise ValueError("param_ranges cannot be empty")
-
+        if not self.n_timesteps > 0:
+            raise ValueError("n_timesteps must be positive")

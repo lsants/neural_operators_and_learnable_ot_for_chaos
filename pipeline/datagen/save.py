@@ -26,11 +26,11 @@ def save_npz(
     metadata = {
         "experiment": config.experiment,
         "n_samples": config.n_samples,
-        "n_trajectories": len(data),
         "t_start": config.t_start,
         "t_end": config.t_end,
         "subsample_stride": config.subsample_stride,
         "dt": config.dt,
+        "n_timesteps": config.n_timesteps,
         "param_ranges": config.param_ranges,
         "n_dim": config.n_dim,
         "timestamp": datetime.now().isoformat(),

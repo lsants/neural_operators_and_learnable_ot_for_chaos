@@ -3,15 +3,14 @@
     "experiment": "lorenz63",
     "n_samples": 1,
     "t_start": 0,
-    "t_end": 1000,
-    "dt": 0.001,
-    "subsample_stride": 10,
+    "t_end": 10000,
+    "dt": 0.01,
+    "subsample_stride": 100,
     "param_ranges": {
         "sigma": [8, 16],
         "beta": [2.2, 3.2],
-        "rho": [24, 35]
+        "rho": [28, 35]
     },
     "n_dim": 3,
-    "noise_level": 0.3,
     "output_dir": "data/"
 }

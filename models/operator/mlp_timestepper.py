@@ -1,16 +1,17 @@
 import torch
 import torch.nn as nn
+from models.architectures.activation_fns import ACTIVATION_MAP
 
 class TimeStepperMLP(nn.Module):
-    def __init__(self, input_dim, hidden_layers, 
-                 activation, output_dim):
+    def __init__(self, input_dim: int, hidden_layers: list[int], 
+                 activation: str, output_dim: int):
         super(TimeStepperMLP, self).__init__()
         layers = []
         prev_dim = input_dim
         
         for hidden_dim in hidden_layers:
             layers.append(nn.Linear(prev_dim, hidden_dim))
-            layers.append(activation)
+            layers.append(ACTIVATION_MAP[activation])
             prev_dim = hidden_dim
         
         layers.append(nn.Linear(prev_dim, output_dim))

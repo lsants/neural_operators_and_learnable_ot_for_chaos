@@ -23,13 +23,9 @@ pick_port() {
 # ------------------------------------------------------------------- #
 TRAIN_CFG="$(realpath configs/train.json)"
 EVAL_CFG="$(realpath configs/eval.json)"
-OP_CFG="$(realpath configs/operator.json)"
-LOSS_CFG="$(realpath configs/loss.json)"
 
 COMMON_ARGS=(
     --train-config   "$TRAIN_CFG"
-    --operator-config "$OP_CFG"
-    --loss-config      "$LOSS_CFG"
 )
 
 # ------------------------------------------------------------------ #
@@ -69,7 +65,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     echo "Running locally on macOS (single GPU/CPU)"
     python main.py \
         "${COMMON_ARGS[@]}" \
-        # --eval-config "$EVAL_CFG" --run-eval   # uncomment if you want eval locally
+        --eval-config "$EVAL_CFG" --run-eval   # uncomment if you want eval locally
 else
     echo "Unsupported OS: $OSTYPE"
     exit 1

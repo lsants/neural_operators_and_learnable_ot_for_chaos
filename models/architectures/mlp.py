@@ -1,5 +1,6 @@
 import torch
 from typing import Callable, Optional
+from .activation_fns import ACTIVATION_MAP
 
 
 class MLP(torch.nn.Module):

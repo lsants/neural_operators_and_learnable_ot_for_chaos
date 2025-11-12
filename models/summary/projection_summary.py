@@ -1,9 +1,10 @@
 import torch
 from .base_summary import SummaryStatistic
 
-class IdentitySummaryStats(SummaryStatistic):
-    def __init__(self):
+class ProjectionSummaryStats(SummaryStatistic):
+    def __init__(self, state: int):
         super().__init__()
+        self.state = state
         self.identity = torch.nn.Identity()
 
     @property
@@ -11,4 +12,6 @@ class IdentitySummaryStats(SummaryStatistic):
         return
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.identity(x)
+        identity = self.identity(x)
+        projection = identity[:, :, self.state][..., None]
+        return projection
