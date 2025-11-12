@@ -1,7 +1,10 @@
+import os
 import torch
+import wandb
 import numpy as np
 import matplotlib.pyplot as plt
 from manim import config
+from pathlib import Path
 from models.operator.mlp_timestepper import TimeStepperMLP
 from models.summary.mlp_summary import MLPSummaryStats
 from pipeline.visualization.lorentz63_plots import plot_l63_full_single, plot_l63_full_double
@@ -11,14 +14,46 @@ from pipeline.testing.eval_configs import EvaluateConfig
 from pipeline.testing.metrics import compute_trajectory_errors
 from pipeline.testing.eval_rollout import eval_rollout
 
-def eval_exp(eval_config: dict[str, EvaluateConfig]):
+def eval_exp(
+        eval_config: dict[str, EvaluateConfig],
+        *,
+        wandb_project: str | None = None,
+        wandb_entity: str | None = None,
+        wandb_group: str | None = None,
+        wandb_run_name: str | None = None,
+    ) -> None:
     exp_config = eval_config['eval_config']
-    checkpoint_path = exp_config.checkpoint_path
-    dataset_path = exp_config.test_data_path
+    checkpoint_path = Path(exp_config.checkpoint_path)
+    dataset_path = Path(exp_config.test_data_path)
     eval_steps = exp_config.rollout_steps
 
     output_path = str(checkpoint_path).rsplit('/', 3)[0] + '/' + str(checkpoint_path).rsplit('/', 3)[1]
+    output_path = Path(output_path)
     checkpoint = torch.load(checkpoint_path)
+
+    use_wandb = wandb_project is not None
+    if use_wandb:
+        run = wandb.init(
+            project=wandb_project,
+            entity=wandb_entity,
+            job_type="eval",
+            group=wandb_group,
+            name=wandb_run_name,
+            config={
+                "eval": {
+                    "checkpoint_path": str(checkpoint_path),
+                    "dataset_path": str(dataset_path),
+                    "rollout_steps": eval_steps,
+                    "dtype": exp_config.dtype,
+                    "device": exp_config.device,
+                },
+                "train_config": checkpoint.get("train_config", {}),
+                "emulator_config": checkpoint.get("emulator_config", {}),
+                "summary_config": checkpoint.get("summary_config", {}),
+            },
+        )
+    else:
+        run = None
 
     # Load emulator model and summary model 
     ot_or_noot = 'ot' if checkpoint['train_config']['ot_penalty'] > 0.0 else 'no_ot'
@@ -121,9 +156,11 @@ def eval_exp(eval_config: dict[str, EvaluateConfig]):
         figures.append(plot_l63_full_double(s_pred[0], s_true[0], plotted_variable_1=s_label + " True", plotted_variable_2=s_label + " Predicted", first=s_pred_comp_labels, second=s_true_comp_labels))
         figures.append(plot_l63_full_double(s_true[0], u_true[0], plotted_variable_1=u_label, plotted_variable_2=s_label, first=u_comp_labels, second=s_comp_labels))
 
-    # Save all figures
+    image_paths = []
     for i, fig in enumerate(figures, 1):
-        fig.savefig(f'{output_path}/figure_{i}.png', dpi=300, bbox_inches='tight')
+        p = output_path / f'figure_{i}.png'
+        fig.savefig(p, dpi=300, bbox_inches='tight')
+        image_paths.append(str(p))
 
     print("Evaluation Complete!")
 
@@ -139,7 +176,61 @@ def eval_exp(eval_config: dict[str, EvaluateConfig]):
     scene = Lorenz63(u_true[0], u_pred[0], s_true[0][:, :, state_index] if summary_type == 'projection' else s_true[0])
     scene.render()
 
-    # plt.show()
+    video_path = Path(f"{output_path}/lorenz63.mp4")
+
+    # --------------- WandB Logging ----------------
+    if use_wandb:
+        # 1) Scalars
+        wandb.log({
+            "eval/mse": mse,
+            "eval/histogram_error": float(errors['histogram_error']),
+            "eval/energy_spectrum_error": float(errors['energy_spectrum']),
+            "eval/T": int(T),
+            "eval/ot": int(ot_or_noot == 'ot'),
+            "eval/noise_level": float(checkpoint['train_config']['noise_level']),
+        })
+
+        # 2) Histograms (raw arrays)
+        wandb.log({
+            "eval/u_true": wandb.Histogram(u_true.reshape(-1)),
+            "eval/u_pred": wandb.Histogram(u_pred.reshape(-1)),
+            "eval/s_true": wandb.Histogram(s_true.reshape(-1)),
+            "eval/s_pred": wandb.Histogram(s_pred.reshape(-1)),
+        })
+
+        # 3) Images
+        wandb.log({
+            "eval/figures": [wandb.Image(p, caption=os.path.basename(p)) for p in image_paths]
+        })
+
+        # 4) Video (if rendered)
+        if video_path.exists():
+            wandb.log({"eval/lorenz63_video": wandb.Video(str(video_path), fps=60, format="mp4")})
+
+        # 5) The **entire output directory** as an Artifact
+        art = wandb.Artifact(
+            name=f"eval-output-{output_path.parent.name}-{output_path.name}",
+            type="evaluation",
+            metadata={
+                "checkpoint_path": str(checkpoint_path),
+                "dataset_path": str(dataset_path),
+                "summary_type": summary_type,
+                "ot": ot_or_noot,
+                "noise": noisy_or_clean,
+            },
+        )
+        art.add_dir(str(output_path))  # <— grabs *everything* in that folder recursively
+        # (Optional) also pin the checkpoint & dataset explicitly:
+        if checkpoint_path.exists():
+            art.add_file(str(checkpoint_path))
+        if dataset_path.exists():
+            art.add_file(str(dataset_path))
+        run.log_artifact(art)
+
+        # (Nice to have) put key metrics on the run summary
+        wandb.run.summary["eval/mse"] = mse
+
+        run.finish()
 
 if __name__ == "__main__":
     dataset_path = 'data/lorenz63/9bda2e47/test_data.npz'

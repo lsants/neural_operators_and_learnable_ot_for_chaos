@@ -55,7 +55,7 @@ def train(train_config: dict, use_wandb: bool):
 
     if use_wandb: 
         wandb.init(
-            project="OTdynSys",
+            project="chaos-emulator",
             name=f"{exp_name[:-9]}",
             config=config
         )
