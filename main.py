@@ -23,14 +23,22 @@ def main():
         ]
     )
 
-    exp_path = train(train_config, use_wandb=False)
+    exp_path = train(train_config, use_wandb=True)
+    group = exp_path.parent.name
+    run_name = exp_path.name
 
     # --------- Optional Evaluation --------------
     if args.run_eval:
             if args.eval_config is None:
                 raise ValueError("--eval-config is required when --run-eval is used")
             eval_cfg = get_eval_configs( args.eval_config, exp_path)
-            eval_exp(eval_cfg)
+            eval_exp(
+                eval_cfg,
+                wandb_project="chaos-emulator",
+                wandb_entity=None,
+                wandb_group=group,
+                wandb_run_name=f"{run_name}-eval",
+            )
 
 if __name__ == '__main__':
     main()
