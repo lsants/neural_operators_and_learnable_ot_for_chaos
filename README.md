@@ -23,4 +23,4 @@ bash experiments/new/srun.sh
 ```
 
 ### Evaluation
-To just evaluate a trained model, ```run python -m pipeline.testing.evaluate```
+To just evaluate a trained model, modify ```pipeline/testing/evaluate.py``` to fetch the correct dataset and checkpoint path (In the ```if __name__ == '__main__'``` block) and from the repo folder, run ```python -m pipeline.testing.evaluate```
