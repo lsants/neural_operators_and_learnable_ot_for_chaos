@@ -12,7 +12,7 @@ This is the implementation for the workshop paper TBD
 ### Prepare the training data
 To generate the problem data in the `datagen` folder, modify the ```/configs/datagen/datagen_config.json``` file to define the dynamical system and run:
 ```
-python /pipeline/generate_data.py
+python /pipeline/datagen/generate_data.py
 ```
 
 
