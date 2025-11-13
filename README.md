@@ -10,9 +10,9 @@ This is the implementation for the workshop paper TBD
 ```
 
 ### Prepare the training data
-To generate the problem data in the `datagen` folder, modify the ```exp_config.json``` file to define the dynamical system and run:
+To generate the problem data in the `datagen` folder, modify the ```/configs/datagen/datagen_config.json``` file to define the dynamical system and run:
 ```
-python generate_data.py
+python /pipeline/generate_data.py
 ```
 
 
@@ -23,4 +23,4 @@ bash experiments/new/srun.sh
 ```
 
 ### Evaluation
-TBD
+To just evaluate a trained model, ```run python -m pipeline.testing.evaluate```
